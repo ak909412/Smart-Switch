@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Room Light Control</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f2f2f2;
+    }
+
+    h1 {
+      color: #007BFF;
+    }
+
+    .button-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 20px;
+    }
+
+    .control-button {
+      padding: 10px 20px;
+      margin: 10px;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    #lightOnButton {
+      background-color: #007BFF;
+      color: white;
+    }
+
+    #lightOffButton {
+      background-color: #007BFF;
+      color: white;
+    }
+
+    .scheduler-container {
+      margin-top: 20px;
+    }
+
+    .scheduler-input {
+      margin: 10px;
+      font-size: 14px;
+    }
+
+    .scheduler-display {
+      margin-top: 10px;
+    }
+
+    #currentTimeDisplay {
+      font-size: 18px;
+      margin-top: 10px;
+      color: #555;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>CONTROL FROM A FAR </h1>
+  <div class="scheduler-display">
+    <p>Start Time: <span id="startTimeDisplay">Not Set</span></p>
+    <p>End Time: <span id="endTimeDisplay">Not Set</span></p>
+    <p id="currentTimeDisplay">Current Time: </p>
+  </div>
+
+  <div class="button-container">
+    <button class="control-button" id="lightOnButton">Motor On</button>
+    <button class="control-button" id="lightOffButton">Motor Off</button>
+  </div>
+
+  <div class="scheduler-container">
+    <label for="startTime" class="scheduler-input">Start Time: </label>
+    <input type="time" id="startTime" class="scheduler-input">
+
+    <label for="endTime" class="scheduler-input">End Time: </label>
+    <input type="time" id="endTime" class="scheduler-input">
+
+    <button id="setSchedulerButton" class="control-button">Set Scheduler</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aws-sdk/2.1109.0/aws-sdk.min.js"></script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const lightOnButton = document.getElementById("lightOnButton");
+      const lightOffButton = document.getElementById("lightOffButton");
+      const startTimeInput = document.getElementById("startTime");
+      const endTimeInput = document.getElementById("endTime");
+      const setSchedulerButton = document.getElementById("setSchedulerButton");
+      const startTimeDisplay = document.getElementById("startTimeDisplay");
+      const endTimeDisplay = document.getElementById("endTimeDisplay");
+      const currentTimeDisplay = document.getElementById("currentTimeDisplay");
+      let signalSent = false; // Flag to track if the signal has been sent
+
+      const endpoint = "aws endpoint";
+      const topic = "aws topic";
+
+      AWS.config.update({
+        accessKeyId: "AWS IOT CORE accessKeyId",
+        secretAccessKey: "AWS IOT CORE secretAccessKey",
+        region: "ap-south-1",
+      });
+
+      const iotdata = new AWS.IotData({
+        endpoint: endpoint,
+      });
+
+      const sendSignalToAWSIoT = async (signal) => {
+        try {
+          const params = {
+            topic: topic,
+            payload: signal,
+            qos: 0,
+          };
+
+          await iotdata.publish(params).promise();
+          console.log(`Message ${signal} sent to AWS IoT`);
+        } catch (error) {
+          console.error("Error sending message to AWS IoT:", error);
+        }
+      };
+
+      const setButtonColor = (button, color) => {
+        button.style.backgroundColor = color;
+      };
+
+      const updateCurrentTime = () => {
+        const now = new Date();
+        currentTimeDisplay.textContent = `Current Time: ${now.toLocaleTimeString()}`;
+      };
+
+      const checkScheduler = () => {
+        updateCurrentTime(); // Update current time with every check
+        const currentTime = new Date().getTime();
+        const startTime = new Date(`2023-12-01T${startTimeInput.value}`).getTime();
+        const endTime = new Date(`2023-12-01T${endTimeInput.value}`).getTime();
+
+        if (!signalSent && (currentTime === startTime || currentTime === endTime)) {
+          if (currentTime === startTime) {
+            sendSignalToAWSIoT("0");
+            setButtonColor(lightOnButton, "green");
+            setButtonColor(lightOffButton, "#007BFF");
+          } else if (currentTime === endTime) {
+            sendSignalToAWSIoT("1");
+            setButtonColor(lightOffButton, "red");
+            setButtonColor(lightOnButton, "#007BFF");
+          }
+
+          // Set the flag to true to indicate that the signal has been sent
+          signalSent = true;
+        }
+      };
+
+      setSchedulerButton.addEventListener("click", () => {
+        // Reset the flag when the user clicks the "Set Scheduler" button
+        signalSent = false;
+
+        // Call checkScheduler once to check immediately after setting the scheduler
+        checkScheduler();
+
+        // Check the scheduler every second
+        setInterval(checkScheduler, 1000);
+
+        const startDateTime = new Date(`2023-12-01T${startTimeInput.value}`);
+        const endDateTime = new Date(`2023-12-01T${endTimeInput.value}`);
+        startTimeDisplay.textContent = startDateTime.toLocaleTimeString();
+        endTimeDisplay.textContent = endDateTime.toLocaleTimeString();
+      });
+
+      lightOnButton.addEventListener("click", () => {
+        sendSignalToAWSIoT("0");
+        setButtonColor(lightOnButton, "green");
+        setButtonColor(lightOffButton, "#007BFF");
+      });
+
+      lightOffButton.addEventListener("click", () => {
+        sendSignalToAWSIoT("1");
+        setButtonColor(lightOffButton, "red");
+        setButtonColor(lightOnButton, "#007BFF");
+      });
+    });
+  </script>
+</body>
+
+</html>
